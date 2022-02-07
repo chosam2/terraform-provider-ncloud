@@ -13,10 +13,36 @@ resource "ncloud_vpc" "vpc" {
   ipv4_cidr_block = "10.0.0.0/16"
 }
 
+# Route Table
+#resource "ncloud_route_table" "route_table" {
+#  vpc_no                = ncloud_vpc.vpc.id
+#  is_default		= "true"
+#  supported_subnet_type = "PUBLIC"
+#  name                  = "route-table"
+#  description           = "NATGW Route Table"
+#}
+
+# NAT Gateway
+resource "ncloud_nat_gateway" "nat_gateway" {
+  vpc_no = ncloud_vpc.vpc.id
+  zone   = "KR-2"
+  name        = "nat-gw"
+  description = "NATGW"
+}
+
+resource "ncloud_route" "foo" {
+  #route_table_no         = ncloud_route_table.route_table.id
+  route_table_no         = ncloud_vpc.vpc.default_private_route_table_no
+  destination_cidr_block = "0.0.0.0/0"
+  target_type            = "NATGW"
+  target_name            = ncloud_nat_gateway.nat_gateway.name
+  target_no              = ncloud_nat_gateway.nat_gateway.id
+}
+
 resource "ncloud_subnet" "node_subnet" {
   vpc_no         = ncloud_vpc.vpc.id
   subnet         = "10.0.1.0/24"
-  zone           = "KR-1"
+  zone           = "KR-2"
   network_acl_no = ncloud_vpc.vpc.default_network_acl_no
   subnet_type    = "PRIVATE"
   name           = "node-subnet"
@@ -26,7 +52,7 @@ resource "ncloud_subnet" "node_subnet" {
 resource "ncloud_subnet" "lb_subnet" {
   vpc_no         = ncloud_vpc.vpc.id
   subnet         = "10.0.100.0/24"
-  zone           = "KR-1"
+  zone           = "KR-2"
   network_acl_no = ncloud_vpc.vpc.default_network_acl_no
   subnet_type    = "PRIVATE"
   name           = "lb-subnet"
@@ -54,7 +80,7 @@ resource "ncloud_nks_cluster" "cluster" {
   kube_network_plugin         = "cilium"
   subnet_no_list              = [ ncloud_subnet.node_subnet.id ]
   vpc_no                      = ncloud_vpc.vpc.id
-  zone                        = "KR-1"
+  zone                        = "KR-2"
   log {
     audit = true
   }
@@ -62,12 +88,12 @@ resource "ncloud_nks_cluster" "cluster" {
 resource "ncloud_nks_node_pool" "node_pool" {
   cluster_uuid = ncloud_nks_cluster.cluster.uuid
   node_pool_name = "pool1"
-  node_count     = 1
+  node_count     = 2
   product_code   = "SVR.VSVR.STAND.C002.M008.NET.SSD.B050.G002"
   subnet_no      = ncloud_subnet.node_subnet.id
   autoscale {
     enabled = true
-    min = 1
-    max = 2
+    min = 2
+    max = 3
   }
 }
